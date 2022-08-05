@@ -1,0 +1,31 @@
+.idea/*
+target/*
+
+# Build Artifacts
+build
+target
+out
+*.bak
+*.class
+
+# IDEA artifacts
+*.iml
+*.log
+*.ipr
+*.iws
+*.idea
+
+*.jar
+*.ear
+*.war
+
+# Bower
+bower_components
+
+# Common
+logs
+.tmp
+.merge_file*
+coverage
+nbconfiguration.xml
+img
