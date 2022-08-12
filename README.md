@@ -81,3 +81,108 @@ spring:
 ```java
 jdbc:h2:tcp://localhost:9092/mem:spring-security
 ```
+- Module # 2 - Custom Authentication
+```shell
+git checkout spring-security-2-custom-authentication
+```
+Theoretic Part:
+<br/>
+<u>Glossary</u>
+<ul>
+<li>FilterChain is an object provided by the servlet container to the developer giving a view into the invocation chain of a filtered request for a resource.</li>
+<li>AuthenticationFilter delegate to AuthenticationManager (one) that find appropriate AuthenticationProviders (many). If AP need credentials that it use UserDetailsService and validate pwd use PasswordEncoder. If succeed request return and AuthenticationFilter save it into SecurityContext</li>
+<li>AuthenticationManager processes an Authentication request. Attempts to authenticate the passed Authentication object, returning a fully populated Authentication object (including granted authorities) if successful.</li>
+<li>Authentication Represents the token for an authentication request or for an authenticated principal once the request has been processed by the AuthenticationManager.authenticate(Authentication) method.</li>
+<li>AuthenticationProvider Indicates a class can process a specific Authentication implementation.</li>
+<li>SecurityContext Interface defining the minimum security information associated with the current thread of execution.</li>
+</ul>
+
+Coding Parts:
+<br/>
+Preconditions related to module 2:
+```yaml
+secret:
+  key: secret
+```
+First of all we are need to provide bean named SecurityFilterChain into Spring Security Configuration class beside using deprecated class WebSecurityConfigurerAdapter (extends WebSecurityConfigurerAdapter)
+HttpSecurity allows configuring web based security for specific http requests.
+```java
+@Configuration
+public class SecurityConfiguration {
+
+    private final CustomAuthenticationFilter customAuthenticationFilter;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        return httpSecurity
+                .addFilterAt(customAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .authorizeRequests()
+                .anyRequest()
+                .authenticated()
+                .and()
+                .build();
+    }
+
+}
+```
+Adds the Filter at the location of the specified Filter class. For example, if you want the filter CustomFilter to be registered in the same position as UsernamePasswordAuthenticationFilter, you can invoke:
+addFilterAt(new CustomFilter(), UsernamePasswordAuthenticationFilter.class)
+```java
+@RequiredArgsConstructor
+
+@Component
+public class CustomAuthenticationFilter extends OncePerRequestFilter {
+
+    private final CustomAuthenticationManager customAuthenticationManager;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        filterChain.doFilter(request, response);
+    }
+
+}
+```
+And also we are need to add AuthenticationManager implementation
+```java
+@Component
+public class CustomAuthenticationManager implements AuthenticationManager {
+
+    private final CustomAuthenticationProvider customAuthenticationProvider;
+
+    @Override
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        if (customAuthenticationProvider.supports(authentication.getClass())) {
+            return customAuthenticationProvider.authenticate(authentication);
+        }
+        throw new BadCredentialsException("CustomAuthenticationManager Exception");
+    }
+
+}
+```
+AuthenticationProvider implementation
+```java
+@Component
+public class CustomAuthenticationProvider implements AuthenticationProvider {
+
+    @Value("${secret.key}")
+    private String secretKey;
+
+    @Override
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        CustomAuthentication customAuthentication = (CustomAuthentication) authentication;
+
+        String headerKey = customAuthentication.getKey();
+        if (secretKey.equals(headerKey)) {
+            return new CustomAuthentication(true, null);
+        }
+
+        throw new BadCredentialsException("CustomAuthenticationProvider Exception");
+    }
+
+    @Override
+    public boolean supports(Class<?> authentication) {
+        return CustomAuthentication.class.equals(authentication);
+    }
+
+}
+```
