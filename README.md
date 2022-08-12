@@ -186,3 +186,80 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
 }
 ```
+- Module # 3 - Custom Authentication with Users
+```shell
+git checkout spring-security-3-custom-authentication-with-users
+```
+Updated Components:
+![](images/custom-authentication-with-users.png)
+<br/>
+CustomAuthenticationFilter
+```java
+@Component
+public class CustomAuthenticationFilter extends OncePerRequestFilter {
+
+    private final CustomAuthenticationManager customAuthenticationManager;
+    private static final String KEY_HEADER = "key";
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String key = String.valueOf(request.getHeader(KEY_HEADER));
+
+        String[] retrieveCredentials = retrieveCredentials(request);
+        String username = retrieveCredentials[0];
+        String password = retrieveCredentials[1];
+
+        CustomAuthentication customAuthentication = new CustomAuthentication(false, key, username, password);
+
+        Authentication authenticate = customAuthenticationManager.authenticate(customAuthentication);
+        if (authenticate.isAuthenticated()) {
+            SecurityContextHolder.getContext().setAuthentication(authenticate);
+            filterChain.doFilter(request, response);
+        }
+    }
+
+    private String[] retrieveCredentials(HttpServletRequest request) {
+        String authorizationHeader = String.valueOf(request.getHeader(HttpHeaders.AUTHORIZATION));
+
+        authorizationHeader = authorizationHeader.trim();
+        byte[] base64Token = authorizationHeader.substring(6).getBytes(StandardCharsets.UTF_8);
+        byte[] decoded = Base64.getDecoder().decode(base64Token);
+        String token = new String(decoded, StandardCharsets.UTF_8);
+
+        return token.split(":");
+    }
+
+}
+```
+CustomAuthenticationProvider
+```java
+@Component
+public class CustomAuthenticationProvider implements AuthenticationProvider {
+
+    @Value("${secret.key}")
+    private String secretKey;
+
+    private final JpaUserDetailsService userDetailsService;
+
+    @Override
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        CustomAuthentication customAuthentication = (CustomAuthentication) authentication;
+
+        String headerKey = customAuthentication.getKey();
+        if (secretKey.equals(headerKey)) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(customAuthentication.getUsername());
+            if (userDetails.getPassword().equals(customAuthentication.getPassword())) {
+                return new CustomAuthentication(true, null, userDetails.getUsername(), userDetails.getPassword());
+            }
+        }
+
+        throw new BadCredentialsException("CustomAuthenticationProvider Exception");
+    }
+
+    @Override
+    public boolean supports(Class<?> authentication) {
+        return CustomAuthentication.class.equals(authentication);
+    }
+
+}
+```
