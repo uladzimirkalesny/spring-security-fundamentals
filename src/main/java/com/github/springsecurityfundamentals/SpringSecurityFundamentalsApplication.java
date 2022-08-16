@@ -1,4 +1,4 @@
-package com.example.springsecurityfundamentals;
+package com.github.springsecurityfundamentals;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
